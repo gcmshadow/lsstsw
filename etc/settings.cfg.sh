@@ -28,7 +28,7 @@ VERSIONDB_PUSH=${VERSIONDB_PUSH:-false}
 LSSTSW="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
 
 # the location of source repositories
-REPOSFILE_REPO=${REPOSFILE_REPO:-lsst/repos}
+REPOSFILE_REPO=${REPOSFILE_REPO:-gcmshadow/repos}
 REPOSFILE=${REPOSFILE:-${LSSTSW}/etc/repos.yaml}
 
 # location of the build directory
