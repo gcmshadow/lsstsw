@@ -29,6 +29,7 @@ first_product=
 NAMESPACE=false
 VERBOSE=false
 EUPSVERBOSE=""
+EXTRA_TAG=""
 
 set -e
 DIR=$(cd "$(dirname "$0")"; pwd)
@@ -207,7 +208,8 @@ run unset EUPS_PKGROOT
   fi
   echo
   # shellcheck disable=SC2028
-  echo "tarballs-publish >> Looking for environment information from:\\n --> ${LIST_URL}"
+  echo "tarballs-publish >> Looking for environment information from:"
+  echo "  --> ${LIST_URL}"
   set +e
   RAW_ENV_INFO=$("${CURL}" -s "${LIST_URL}" | grep CONDA_ENV)
   set -e
@@ -217,10 +219,15 @@ run unset EUPS_PKGROOT
   RAW_ENV_REPO=$(echo "${RAW_ENV_INFO}" | awk -F '=' '{ print $2 }')
   ENVREF=$(echo "${RAW_ENV_REPO}" | awk -F '@' '{ print $2 }')
   LSST_CONDA_ENV_NAME="${SPLENV_BASE_NAME}-${ENVREF}"
+  EXTRA_TAG=$("${CURL}" -s "${LIST_URL}" | grep ^#EXTRA_TAG | awk -F '=' '{print $2}')
+  echo "ExtraTag '$EXTRA_TAG'"
 
-# activate the correct environmen tusing envconfig -r ENVREF
+# activate the correct environmen 
   echo
   echo "tarballs-publish >> Environment $LSST_CONDA_ENV_NAME used for eups tag $DISTRIBTAG (envref $ENVREF)."
+  if [[ $EXTRA_TAG != "" ]]; then
+    echo "$0 >> Distribution tagged also as '$EXTRA_TAG'."
+  fi
   # shellcheck disable=1090
   source "$LSSTSW/bin/envconfig" -r "$ENVREF"
   # remove config.txt files from stack to avoid conflicts in publication
@@ -234,15 +241,41 @@ run unset EUPS_PKGROOT
 	EOF
   fi
 
+
+# install the product from source pkgs using eups distrib install -t TAG DISTRIB_PRODUCTS
   # set local (empty) pkgroot
   run rm -rf "${TMP_PKGROOT}"
   run mkdir -p "${TMP_PKGROOT}"
-
-# install the product from source pkgs using eups distrib install -t TAG DISTRIB_PRODUCTS
+  deployed=()
   echo
   echo "tarballs-publish >> Install products" "${DISTRIB_PRODUCTS[@]}" "from eups source packages"
   for product in "${DISTRIB_PRODUCTS[@]}"; do
     if [ "${NAMESPACE}" = true ]; then
+      # check and deploy dependencies if any
+      srcdepfile="${EUPS_PKGREPO}/stack/${product}/src/metapkgdeps/${DISTRIBTAG}.list"
+      if [[ "${srcdepfile:0:4}" != "http" ]]; then
+        srcdepfile="file://${EUPS_PKGREPO}/stack/${product}/src/metapkgdeps/${DISTRIBTAG}.list"
+      fi
+      metapkgsdeps="${TMP_PKGROOT}/${product}/metapkgdeps/${DISTRIBTAG}_metapkgs.list"
+      run mkdir -p $(dirname $metapkgsdeps)
+      if "${CURL}" -s "${srcdepfile}" --output "${metapkgsdeps}" 2>/dev/null; then
+        if [[ $EXTRA_TAG != "" ]]; then
+          cp "${metapkgsdeps}" "${TMP_PKGROOT}/${product}/metapkgdeps/${EXTRA_TAG}_metapkgs.list"
+        fi
+        while read line; do
+          if [ "${line:0:1}" != "#" ] && [[ ! ${deployed[*]} =~ "$line" ]]; then
+            metapkg=$(echo $line | awk -F ':' '{print $1}')
+            reference=$(echo $line | awk -F ':' '{print $2}')
+            echo "Deploying: ./bin/deploy_distrib -t ${reference} ${metapkg}"
+            ./bin/distrib_install -t "${reference}" "${metapkg}"
+            setup "${metapkg}"
+            deployed+=${line}
+          fi
+        done < ${metapkgsdeps}
+      else
+        # in case there are no deps, I don't want to let the corresponding folder in the distribution
+        rm -rf $(dirname $metapkgsdeps)
+      fi
       run eups distrib install --server-dir "${EUPS_PKGREPO}/stack/${product}/src" -t "${DISTRIBTAG}" "${product}" "${VOPT}"
     else
       run eups distrib install --server-dir "${EUPS_PKGREPO}/stack/src" -t "${DISTRIBTAG}" "${product}" "${VOPT}"
@@ -263,6 +296,18 @@ run unset EUPS_PKGROOT
       run eups distrib create --server-dir="${TMP_PKGROOT}/${product}" -d tarball -t "$DISTRIBTAG" "$product" "${VOPT}"
       # Declare the build tag, and declare it $DISTRIBTAG, if set
       run eups distrib declare --server-dir="${TMP_PKGROOT}/${product}" -t "$DISTRIBTAG" "${VOPT}"
+      if [[ $EXTRA_TAG != "" ]]; then
+        echo "tarballs-publish >> Adding tag '${EXTRA_TAG}' at the distribution server."
+        match="EUPS distribution ${DISTRIBTAG} version list. Version 1.0"
+        echo "MATCH: '$match'"
+        sub="EUPS distribution ${EXTRA_TAG} version list. Version 1.0"
+        echo "SUB: '$sub'"
+        dst_tag="${TMP_PKGROOT}/${product}/${DISTRIBTAG}.list"
+        echo $dst_tag
+        extra_tag="${TMP_PKGROOT}/${product}/${EXTRA_TAG}.list"
+        echo $extra_tag
+        sed -r "s|${match}|${sub}|" "$dst_tag" > "${extra_tag}"
+      fi
     done
   else
     for product in "${DISTRIB_PRODUCTS[@]}"; do
@@ -280,6 +325,7 @@ run unset EUPS_PKGROOT
     # push to final PKGROOT enabled
     if [ "${NAMESPACE}" = true ]; then
       for product in "${DISTRIB_PRODUCTS[@]}"; do
+        echo "EnvRef '${ENVREF}'"
         deploy_destination="stack/${product}/${osfamily}/${osplatform}/${compiler}/${ENVREF}/"
         echo
         echo "tarballs-publish >> Publishing to filesystem: ${EUPS_PKGREPO}/${deploy_destination}"

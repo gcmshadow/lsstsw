@@ -29,6 +29,7 @@ BUILD=
 NAMESPACE=false
 VERBOSE=false
 EUPSVERBOSE=""
+EXTRA_TAG=
 
 
 # this is required in order to publish git packages
@@ -47,6 +48,17 @@ TMP_PKGROOT=$LSSTSW/tmp_distrib
 
 
 usage() { echo "Usage: $0 [-n] [-t <distservtag>] <product1> [product2 [...]]" 1>&2; exit 1; }
+
+
+add_metapkgs_upstream() {
+  metafile="${LSSTSW_BUILD_DIR}/build/${product}/metapkgs_upstream.txt"
+  if [ -f $metafile ]; then
+    mkdir -p "${TMP_DISTRIB}/${product}/meta"
+    # need to have an edditional file for extra tag, in case
+    # need to fix the reference, can't be 
+    cp "${metafile}" "${TMP_DISTRIB}/${product}/meta"
+  fi
+}
 
 
 # -------    main
@@ -111,12 +123,21 @@ if [[ -z $DISTRIBTAG ]] || [[ $DISTRIBTAG == "" ]]; then
   #DISTRIBTAG="b${BUILD:1}"
   DISTRIBTAG="${BUILD}"
   #DISTRIBTAG="d$(date '+%Y%m%d%H%M%S')"
+  # in this case we need to add an extra tag, that declares if we are on master or in a branch
+  # to be sued by downstream SWProducts (meta packages with dependencies)
+  # this makes sense only if we are using namespaces
+  # - MASTER if no references have been provided when rebuild
+  # - REBUILDREF if one or more references have been provided when rebuild (only the first shall be considered)
+  EXTRA_TAG=$(cat "$LSSTSW/build/builds/${BUILD}.info" | grep "^Ref" | awk '{print $2}')
 fi
 echo
-echo "src-publish >> Distribution Tag identification $DISTRIBTAG. BuildID ${BUILD}"
+echo "$0 >> Distribution Tag identification '$DISTRIBTAG'. BuildID ${BUILD}"
+if [[ $EXTRA_TAG ]]; then
+  echo "src-publish >> Distribution tagged also as '$EXTRA_TAG'."
+fi
 
 # once the buildID is givem the environment name can be identified
-LSST_CONDA_ENV_NAME=$(grep -E '^environment_name:' "${LSSTSW}/build/builds/${BUILD}.env" | awk '{print $2}')
+LSST_CONDA_ENV_NAME=$(grep -E '^Environment_name:' "${LSSTSW}/build/builds/${BUILD}.env" | awk '{print $2}')
 ENVREF="${LSST_CONDA_ENV_NAME#${SPLENV_BASE_NAME}-}"
 CONDA_ENV_REF="${LSST_SPLENV_REPO}@${ENVREF}"
 echo
@@ -161,11 +182,14 @@ if [ "${NAMESPACE}" = true ]; then
     run eups distrib create --server-dir="$TMP_PKGROOT/${product}" -f generic -d eupspkg -t "${BUILD}" "${product}" "${VOPT}"
     # 
     run eups distrib declare --server-dir="$TMP_PKGROOT/${product}" -t "$BUILD" "${VOPT}"
+    #
+    # store metapkgs_upstram information in distribution
+    add_metapkgs_upstream
     echo
     echo "src-publish >> Adding tag '${DISTRIBTAG}' at the distribution server."
     match='EUPS distribution ([^ ]+) version list. Version 1.0'
     # shellcheck disable=SC1117
-    sub="EUPS distribution ${DISTRIBTAG} version list. Version 1.0\n#BUILD=\1\n#CONDA_ENV=${CONDA_ENV_REF}"
+    sub="EUPS distribution ${DISTRIBTAG} version list. Version 1.0\n#BUILD=\1\n#CONDA_ENV=${CONDA_ENV_REF}\n#EXTRA_TAG=${EXTRA_TAG}"
     src_tag="${TMP_PKGROOT}/${product}/tags/${BUILD}.list"
     tmp_list=$(mktemp)
     dst_tag="${TMP_PKGROOT}/${product}/tags/${DISTRIBTAG}.list"
@@ -177,6 +201,24 @@ if [ "${NAMESPACE}" = true ]; then
     # remove the original bNNNN tag to reduce tag proliferation
     if [[ "${BUILD}" != "${DISTRIBTAG}" ]]; then
       rm "$src_tag"
+    fi
+    # declare EXTRA_TAG if defined
+    if [[ $EXTRA_TAG ]]; then
+      echo "src-publish >> Adding tag '${EXTRA_TAG}' at the distribution server."
+      match="EUPS distribution ${BUILD} version list. Version 1.0"
+      sub="EUPS distribution ${EXTRA_TAG} version list. Version 1.0"
+      extra_tag="${TMP_PKGROOT}/${product}/tags/${EXTRA_TAG}.list"
+      sed -r "s|${match}|${sub}|" "$dst_tag" > "${extra_tag}"
+    fi
+    # save metapkgs information
+    metapkglist="${LSSTSW_BUILD_DIR}/${product}_metapkgs.list"
+    if [ -f "${metapkglist}" ]; then
+      mkdir -p "${TMP_PKGROOT}/${product}/metapkgdeps"
+      cp "${metapkglist}" "${TMP_PKGROOT}/${product}/metapkgdeps/${BUILD}.list"
+      if [[ $EXTRA_TAG ]]; then
+        # not sure that this is needed, but it will not proliferate the files
+        cp "${metapkglist}" "${TMP_PKGROOT}/${product}/metapkgdeps/${EXTRA_TAG}.list"
+      fi
     fi
   done
 else

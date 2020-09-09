@@ -1,0 +1,81 @@
+#!/bin/bash
+#
+# ********** DONT RUN THIS UNLESS YOU UNDERSTAND WHAT IT DOES ********
+# **********             SERIOUS DAMAGE MAY OCCUR             ********
+#
+# Given an EUPS product and reference, it will install it as follows
+# - eups tarballs if available
+# - eups src packages if available
+# - git repository using rebuild
+# 
+# Note that this tool require lsstsw framework active and properly configured
+# Also, EUPS_PKGREPO has to be defined, as the location where eups packages
+# are available for installation.
+# It is assumed that namespace are used in storing eups packages
+# 
+# The versiondb repository should be cloned from:
+#
+#   https://github.com/lsst/versiondb.git
+#   git@github.com:lsst/versiondb.git
+#
+# For creation, use:
+#
+#     (mkdir versiondb; cd versiondb; git init; mkdir dep_db ver_db manifests)
+#
+
+set -e
+
+DIR=$(cd "$(dirname "$0")"; pwd)
+# shellcheck disable=SC1090
+. "${DIR}/../etc/settings.cfg.sh"
+# shellcheck disable=SC1090
+. "${DIR}/../bin/utils.sh"
+
+ENVREF="${LSST_CONDA_ENV_NAME#${SPLENV_BASE_NAME}-}"
+
+usage() { echo "Usage: $0 -t <eupstag> eupsproduct" 1>&2; exit 1; }
+
+
+while getopts ":t:" o; do
+  case "$o" in
+  t)
+    EUPS_TAG="$OPTARG"
+    ;;
+  *)
+    usage
+    ;;
+  esac
+done
+shift $((OPTIND-1))
+
+if [[ "$#" == "1" ]]; then
+  PRODUCT="$1"
+else
+  fail "Required EUPS product to install"
+fi
+
+if [[ -z $EUPS_PKGREPO ]]; then
+  fail "No EUPS_PKGREPO environment variable available. Not possible to locate eups packages."
+fi
+
+# get EUPS_PKGROOT
+EUPS_PKGROOT_SRC="$EUPS_PKGREPO/stack/$PRODUCT/src"
+echo $EUPS_PKGROOT_SRC
+define_platform
+compiler="conda-system"
+EUPS_PKGROOT_BIN="$EUPS_PKGREPO/stack/$PRODUCT/${osfamily}/${osplatform}/${compiler}/${ENVREF}/"
+
+# check environment
+#  ---   lets assume that the env is consistent
+
+# check dependencies
+#  ---   how are dependencies stored in eups?
+# deploy dependencies recusivelly
+
+# distrib install product
+export EUPS_PKGROOT="$EUPS_PKGROOT_BIN|$EUPS_PKGROOT_SRC"
+#export EUPS_PKGROOT="$EUPS_PKGROOT_SRC"
+run eups distrib install -t "${EUPS_TAG}" "${PRODUCT}"
+
+
+# vim: tabstop=2 shiftwidth=2 expandtab
