@@ -32,6 +32,74 @@ versiondb_head() {
   (cd "$VERSIONDB" && git rev-parse HEAD)
 }
 
+fix_tag(){
+  local fixed_tag=""
+  list=$(eups list "${metapkg}")
+  # from this list I want to extract the fist match that is an eups tag
+  #  - b[number]       (buildID, could be a timestamp)
+  #  - d_[num*]        (daily tags)
+  #  - w_[num*]        (weekly tags)
+  #  - v_[num*]        (releases)
+  for entry in ${list}
+  do
+    #echo $entry
+    if [[ $entry =~ ^[b]|^[d_]|^[w_]|^[v_] ]]; then
+       echo "Found tag '$entry' for product '${metapkg}'."
+       fixed_tag=$entry
+       break
+    fi
+  done
+  if [ "${fixed_tag}" == "" ]; then 
+    fixed_tag="${reference}" 
+  fi
+  echo "${metapkg}:${fixed_tag}" >> $deployedlist
+}
+
+
+deploy_metapkgs_upstream() {
+  deployed=()
+  for product in "${PRODUCTS[@]}"; do
+    metapkgsfile="${LSSTSW_BUILD_DIR}/${product}/metapkgs_upstream.txt"
+    deployedlist="${LSSTSW_BUILD_DIR}/${product}_metapkgs.list"
+    echo $metapkgsfile
+    if [ -f "${metapkgsfile}" ]; then
+      echo "Deploy metapkgs upstream for product $product"
+      echo "# Deployed Dependencies for product '${product}'" > $deployedlist
+      while read line; do
+        if [[ ! ${deployed[*]} =~ "$line" ]]; then
+          metapkg=$(echo $line | awk -F ':' '{print $1}') 
+          reference=$(echo $line | awk -F ':' '{print $2}')
+          echo "Deploying: ./bin/deploy_distrib -t ${reference} ${metapkg}"
+          ./bin/distrib_install -t "${reference}" "${metapkg}"
+          setup "${metapkg}"
+          fix_tag
+          deployed+=${line}
+        fi
+      done < ${metapkgsfile}
+    fi
+  done
+}
+
+
+save_infos() {
+# save build info
+  echo ${PRODUCTS[@]}
+  echo ${refs[@]}
+  prod=${PRODUCTS[0]}
+  filename="${LSSTSW_BUILD_DIR}/builds/${BUILD}.info"
+  echo "Product $prod" > "${filename}"
+  if [[ ${#refs[@]} -eq 0 ]]; then
+    # no refs have ben provided
+    echo "Ref master" >> "${filename}"
+  else
+    # saving the reference provided for the first product
+    manifestfile="${LSSTSW_BUILD_DIR}/manifest.txt"
+    ref=$(cat $manifestfile | grep $prod | awk '{print $3}' | awk -F '-' '{print $1}' | tr '.' '_')
+    echo "Ref ${ref}" >> "${filename}"
+  fi 
+}
+
+
 save_build_env() {
   # saving environment information
   mkdir -p "${LSSTSW_BUILD_DIR}/builds"
@@ -42,7 +110,7 @@ save_build_env() {
   ref_env="$(mktemp)"
 
   # saving information in environment name
-  echo "environment_name: ${LSST_CONDA_ENV_NAME}" > "${filename}"
+  echo "Environment_name: ${LSST_CONDA_ENV_NAME}" > "${filename}"
 
   # generating pinned list of environment content
   conda list --explicit > "${active_env}"
@@ -182,6 +250,10 @@ fi
   echo "# BUILD ID: $BUILD"
 
   save_build_env
+  save_infos
+
+  # if dependencies these need to be deployed firt with distrib_install
+  deploy_metapkgs_upstream
 
   if [[ $PREP_ONLY == true ]]; then
     exit
