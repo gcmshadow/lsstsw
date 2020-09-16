@@ -196,7 +196,7 @@ run unset EUPS_PKGROOT
             metapkg=$(echo $line | awk -F ':' '{print $1}')
             reference=$(echo $line | awk -F ':' '{print $2}')
             echo "Deploying: ./bin/deploy_distrib -t ${reference} ${metapkg}"
-            ./bin/distrib_install -t "${reference}" "${metapkg}"
+            recursive_distrib "${reference}" "${metapkg}"
             setup "${metapkg}"
             deployed+=${line}
           fi

@@ -17,6 +17,7 @@
 #
 
 set -e
+VERBOSE=false
 
 DIR=$(cd "$(dirname "$0")"; pwd)
 # shellcheck disable=SC1090
@@ -24,7 +25,7 @@ DIR=$(cd "$(dirname "$0")"; pwd)
 # shellcheck disable=SC1090
 . "${DIR}/deploy"
 
-usage() { echo "Usage: $0 [-p] [-n] [-u] [-r <ref> [-r <ref2> [...]]] [-t <eupstag>] [product1 [product2 [...]]]" 1>&2; exit 1; }
+usage() { echo "Usage: $0 [-p] [-n] [-u] [-v] [-r <ref> [-r <ref2> [...]]] [-t <eupstag>] [product1 [product2 [...]]]" 1>&2; exit 1; }
 
 # centos 6 shipped with bash 4.1; this is the best that can be done for
 # returning a value prior to bash 4.3
@@ -44,7 +45,7 @@ fix_tag(){
   do
     #echo $entry
     if [[ $entry =~ ^[b]|^[d_]|^[w_]|^[v_] ]]; then
-       echo "Found tag '$entry' for product '${metapkg}'."
+       #echo "Found tag '$entry' for product '${metapkg}'."
        fixed_tag=$entry
        break
     fi
@@ -64,14 +65,15 @@ deploy_metapkgs_upstream() {
     echo $metapkgsfile
     if [ -f "${metapkgsfile}" ]; then
       echo "Deploy metapkgs upstream for product $product"
-      echo "# Deployed Dependencies for product '${product}'" > $deployedlist
+      > $deployedlist
       while read line; do
         if [[ ! ${deployed[*]} =~ "$line" ]]; then
           metapkg=$(echo $line | awk -F ':' '{print $1}') 
           reference=$(echo $line | awk -F ':' '{print $2}')
           echo "Deploying: ./bin/deploy_distrib -t ${reference} ${metapkg}"
-          ./bin/distrib_install -t "${reference}" "${metapkg}"
-          setup "${metapkg}"
+          recursive_distrib "${reference}" "${metapkg}"
+          #./bin/distrib_install -t "${reference}" "${metapkg}"
+          #setup "${metapkg}"
           fix_tag
           deployed+=${line}
         fi
@@ -170,6 +172,9 @@ while getopts ":pnur:t:" o; do
   t)
     TAG="$OPTARG"
     ;;
+  v)
+    VERBOSE=true
+    ;;
   *)
     usage
     ;;
@@ -180,6 +185,10 @@ shift $((OPTIND-1))
 if [[ "$#" != "0" ]]; then
   PRODUCTS=("$@")
 fi
+
+define_platform
+compiler="conda-system"
+config_curl
 
 (
   # shellcheck disable=SC2154
