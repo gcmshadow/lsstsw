@@ -347,3 +347,54 @@ print_settings() {
     echo "${i}: ${!i}"
   done
 }
+
+
+recursive_distrib() {
+  local eups_tag="$1"
+  local product="$2"
+  # get EUPS_PKGROOT
+  local EUPS_PKGROOT_SRC="$EUPS_PKGREPO/stack/${product}/src"
+  # echo $EUPS_PKGROOT_SRC
+  local EUPS_PKGROOT_BIN="$EUPS_PKGREPO/stack/${product}/${osfamily}/${osplatform}/${compiler}/${ENVREF}/"
+
+  # check environment
+  #  ---   lets assume that the env is consistent
+
+  # check dependencies
+  #  ---   how are dependencies stored in eups?
+  # deploy dependencies recusivelly
+
+  local depfile="${EUPS_PKGREPO}/stack/${product}/src/metapkgdeps/${eups_tag}.list"
+  if [[ "${srcdepfile:0:4}" != "http" ]]; then
+    local depfile="file://${EUPS_PKGREPO}/stack/${product}/src/metapkgdeps/${eups_tag}.list"
+  fi
+  #echo "DepFile $depfile"
+  if  "${CURL}" -s "${depfile}" -o /dev/null 2>/dev/null; then
+    local localdeps=$("${CURL}" -s "${depfile}" 2>/dev/null)
+    echo "Installing '${product}' dependencies:"
+    #while read line; do
+    for line in ${localdeps}; do
+      if [[ ! ${deployed[*]} =~ "$line" ]]; then
+        local metapkg=$(echo $line | awk -F ':' '{print $1}')
+        local reference=$(echo $line | awk -F ':' '{print $2}')
+        echo "Deploying: ./bin/deploy_distrib -t ${reference} ${metapkg}"
+        recursive_distrib "${reference}" "${metapkg}"
+        deployed+=${line}
+      fi
+    done
+    #done < ${localdeps}
+   fi
+
+  # distrib install product
+  export EUPS_PKGROOT="$EUPS_PKGROOT_BIN|$EUPS_PKGROOT_SRC"
+  #export EUPS_PKGROOT="$EUPS_PKGROOT_SRC"
+  #echo "pkgroot: $EUPS_PKGROOT"
+  echo " -- Deploy from eups repo product '${product}', tag '${eups_tag}'"
+  run eups distrib install -t "${eups_tag}" "${product}"
+  setup "${product}"
+  if [[ $VERBOSE == true ]]; then 
+    echo "vvvvvvvv   List of eups setup products   vvvvvvvv"
+    eups list | grep setup
+    echo "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
+  fi
+}
