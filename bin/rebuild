@@ -35,7 +35,7 @@ versiondb_head() {
 
 fix_tag(){
   local fixed_tag=""
-  list=$(eups list "${metapkg}")
+  list=$(eups list "${metapkg}" | grep setup)
   # from this list I want to extract the fist match that is an eups tag
   #  - b[number]       (buildID, could be a timestamp)
   #  - d_[num*]        (daily tags)
@@ -71,10 +71,15 @@ deploy_metapkgs_upstream() {
           metapkg=$(echo $line | awk -F ':' '{print $1}') 
           reference=$(echo $line | awk -F ':' '{print $2}')
           echo "Deploying: ./bin/deploy_distrib -t ${reference} ${metapkg}"
+          eups_distrib=false
           recursive_distrib "${reference}" "${metapkg}"
           #./bin/distrib_install -t "${reference}" "${metapkg}"
           #setup "${metapkg}"
-          fix_tag
+          if [[ "${eups_distrib}" == true ]]; then
+            fix_tag "${reference}" "${metapkg}"
+          else
+            echo "${metapkg}:${reference}" >> $deployedlist
+          fi
           deployed+=${line}
         fi
       done < ${metapkgsfile}
