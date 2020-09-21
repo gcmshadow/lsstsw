@@ -411,6 +411,10 @@ recursive_distrib() {
     if [[ $VERBOSE == true ]]; then 
       echo "vvvvvvvv   List of eups setup products   vvvvvvvv"
       eups list | grep setup
+      #echo "-------"
+      #echo $PYTHONPATH
+      #echo "-------"
+      #echo $LD_LIBRARY_PATH
       echo "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
     fi
   fi

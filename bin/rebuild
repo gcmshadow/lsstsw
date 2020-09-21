@@ -160,7 +160,7 @@ NO_FETCH=false
 UPDATE=false
 refs=()
 
-while getopts ":pnur:t:" o; do
+while getopts ":pnur:t:v" o; do
   case "$o" in
   p)
     PREP_ONLY=true
