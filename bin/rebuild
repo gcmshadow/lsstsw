@@ -46,12 +46,16 @@ fix_tag(){
     #echo $entry
     if [[ $entry =~ ^[b]|^[d_]|^[w_]|^[v_] ]]; then
        #echo "Found tag '$entry' for product '${metapkg}'."
-       fixed_tag=$entry
-       break
+       if [ "$fixed_tag" \< "$entry" ]; then
+         fixed_tag=$entry
+       fi
     fi
   done
   if [ "${fixed_tag}" == "" ]; then 
     fixed_tag="${reference}" 
+  fi
+  if [[ $VERBOSE == true ]]; then
+    echo "rebuild >> fixed_tag $fixed_tag for $metapkg"
   fi
   echo "${metapkg}:${fixed_tag}" >> $deployedlist
 }
@@ -131,9 +135,11 @@ save_build_env() {
     ref1=$(echo "${ref}" | cut -f 1 -d .)
     ref2=$(echo "${ref}" | cut -f 2 -d .)
     local_env_dir="${LSSTSW}/env/${ref1}/${ref2}"
+    ENVREF="${ref2}"
   else
     # the reference is a sha1 or a tag
     local_env_dir="${LSSTSW}/env/${ref}"
+    ENVREF="${ref}"
   fi
 
   if [ -d "${local_env_dir}" ]; then

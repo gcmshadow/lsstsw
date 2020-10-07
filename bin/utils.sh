@@ -403,7 +403,9 @@ recursive_distrib() {
     # distrib install product
     export EUPS_PKGROOT="$EUPS_PKGROOT_BIN|$EUPS_PKGROOT_SRC"
     #export EUPS_PKGROOT="$EUPS_PKGROOT_SRC"
-    #echo "pkgroot: $EUPS_PKGROOT"
+    if [[ $VERBOSE == true ]]; then
+      echo "pkgroot: $EUPS_PKGROOT"
+    fi
     echo " -- Deploy from eups repo product '${product}', tag '${ref_tag}'"
     run eups distrib install -t "${ref_tag}" "${product}"
     setup "${product}"  -t "${ref_tag}"
