@@ -46,6 +46,7 @@ fix_tag(){
     #echo $entry
     if [[ $entry =~ ^[b]|^[d_]|^[w_]|^[v_] ]]; then
        #echo "Found tag '$entry' for product '${metapkg}'."
+       # https://stackoverflow.com/questions/2237080/how-to-compare-strings-in-bash
        if [ "$fixed_tag" \< "$entry" ]; then
          fixed_tag=$entry
        fi
