@@ -279,7 +279,7 @@ main() {
   # check if eups is not already available in the environment
   # made it available in a separe eups-base environment
   if ! command -v eups > /dev/null; then
-    echo "error: o eups found in the active environment ..."
+    echo "error: No eups found in the active environment ..."
     echo "  ... trying to use a stacked eups-base environment"
     conda deactivate
     if ! conda env list | grep "^eups-base " > /dev/null; then

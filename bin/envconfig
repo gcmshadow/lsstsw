@@ -94,10 +94,6 @@ export PATH="$LSSTSW/bin:$PATH"
 
 export MANPATH="$LSSTSW/lfs/share/man:"
 
-# need to activate the miniconda base environment to get the correct list of environments
-# shellcheck disable=SC1091
-conda activate base
-
 if $INTERACTIVE ; then
   raw_envs=()
   # get the list of available environments
@@ -158,7 +154,7 @@ export LSST_CONDA_ENV_NAME
 # check if eups is not already available in the environment
 # made it available in a separe eups-base environment
 if ! command -v eups > /dev/null; then
-  echo "error: o eups found in the active environment ..."
+  echo "error: No eups found in the active environment ..."
   echo "  ... trying to use a stacked eups-base environment"
   conda deactivate
   if ! conda env list | grep "^eups-base " > /dev/null; then
