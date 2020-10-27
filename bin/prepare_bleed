@@ -46,7 +46,7 @@ usage() {
 		Specific options:
 	    -h          show this message
 
-                EOF
+		EOF
   )"
 }
 
