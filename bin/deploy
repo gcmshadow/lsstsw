@@ -126,7 +126,7 @@ main() {
 
   cd "$LSSTSW"
 
-  fetch_repos.yaml 'u/gcm/shadow'
+  fetch_repos.yaml
 
 
   if [[ $USE_EXISTING_CONDA == true ]]; then

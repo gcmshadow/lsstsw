@@ -236,7 +236,7 @@ config_curl
   #
   if [[ $UPDATE == true ]]; then
     config_curl
-    fetch_repos.yaml 'master'
+    fetch_repos.yaml
   fi
 
   #
