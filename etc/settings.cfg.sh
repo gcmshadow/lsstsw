@@ -29,7 +29,7 @@ LSSTSW="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
 
 # the location of source repositories
 REPOSFILE_REPO=${REPOSFILE_REPO:-gcmshadow/repos}
-REPOSFILE_REF=${REPOSFILE_REF:-gcmshadow}
+REPOSFILE_REF=${REPOSFILE_REF:-u/gcm/shadow}
 REPOSFILE=${REPOSFILE:-${LSSTSW}/etc/repos.yaml}
 
 # location of the build directory

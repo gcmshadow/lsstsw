@@ -358,8 +358,6 @@ fetch_repos.yaml() {
 
   local baseurl="https://raw.githubusercontent.com/${repo}/${ref}"
 
-  echo " ---->>>> ${baseurl}/etc/repos.yaml"
-
   $CURL "${CURL_OPTS[@]}" \
     -L \
     "${baseurl}/etc/repos.yaml" \
@@ -431,7 +429,7 @@ define_platform() {
       ;;
   esac
   echo
-  echo "tarballs-publish >> Platform parameters for binary identification:"
+  echo "$exec_name >> Platform parameters for binary identification:"
   echo "  -  os-family: ${osfamily}"
   echo "  -  os-release: ${osrelease}"
   echo "  -  os-platform: ${osplatform}"

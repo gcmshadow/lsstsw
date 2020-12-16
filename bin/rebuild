@@ -16,6 +16,9 @@
 #     (mkdir versiondb; cd versiondb; git init; mkdir dep_db ver_db manifests)
 #
 
+exec_name="$(basename -- $0)"
+echo "Executing $exec_name..."
+
 set -e
 VERBOSE=false
 
@@ -37,18 +40,25 @@ fix_tag(){
   local fixed_tag=""
   list=$(eups list "${metapkg}" | grep setup)
   # from this list I want to extract the fist match that is an eups tag
-  #  - b[number]       (buildID, could be a timestamp)
-  #  - d_[num*]        (daily tags)
-  #  - w_[num*]        (weekly tags)
-  #  - v_[num*]        (releases)
+  #  - b[number]      (buildID, when using versionDB)
+  #  - T[number]      (timestamp, when USE_TIMESTAMP=true)
+  #  - v[num*]        (release or release candidate)
   for entry in ${list}
   do
     #echo $entry
-    if [[ $entry =~ ^[b]|^[d_]|^[w_]|^[v_] ]]; then
-       #echo "Found tag '$entry' for product '${metapkg}'."
-       # https://stackoverflow.com/questions/2237080/how-to-compare-strings-in-bash
-       if [ "$fixed_tag" \< "$entry" ]; then
-         fixed_tag=$entry
+    if [[ $USE_TIMESTAMP == true ]]; then
+       if [[ $entry =~ ^[T]|^[v] ]]; then
+          # https://stackoverflow.com/questions/2237080/how-to-compare-strings-in-bash
+          if [ "$fixed_tag" \< "$entry" ]; then
+            fixed_tag=$entry
+          fi
+       fi
+    else
+       if [[ $entry =~ ^[b]|^[v] ]]; then
+          # https://stackoverflow.com/questions/2237080/how-to-compare-strings-in-bash
+          if [ "$fixed_tag" \< "$entry" ]; then
+            fixed_tag=$entry
+          fi
        fi
     fi
   done
@@ -165,6 +175,7 @@ save_build_env() {
 PREP_ONLY=false
 NO_FETCH=false
 UPDATE=false
+USE_TIMESTAMP=false
 refs=()
 
 while getopts ":pnur:t:v" o; do
@@ -186,6 +197,9 @@ while getopts ":pnur:t:v" o; do
     ;;
   v)
     VERBOSE=true
+    ;;
+  T)
+    USE_TIMESTAMP=true
     ;;
   *)
     usage
@@ -248,6 +262,9 @@ config_curl
     VERSIONDB_HEAD_PREBUILD=$(versiondb_head)
   fi
 
+  BUILD_ID="T$(date '+%Y%m%d%H%M%S')"
+  echo "$exec_name >>  using build-ID $BUILD_ID"
+
   ARGS=()
   if [[ $NO_FETCH == true ]]; then
     ARGS+=("--no-fetch")
@@ -255,6 +272,9 @@ config_curl
   ARGS+=("--repos=${REPOSFILE}")
   ARGS+=("--exclusion-map=${EXCLUSIONS}")
   ARGS+=("--version-git-repo=${VERSIONDB}")
+  if [[ $USE_TIMESTAMP == true ]]; then
+    ARGS+=("--build-id=${BUILD_ID}")
+  fi
   ARGS+=("$LSSTSW_BUILD_DIR")
   ARGS+=("${refs[@]}")
   ARGS+=("${PRODUCTS[@]}")
@@ -301,7 +321,7 @@ config_curl
     eups-copy-tag "$BUILD" "$TAG"
   fi
 
-  echo "# BUILD $BUILD completed."
+  echo "$exec_name >>  BUILD $BUILD completed."
 ) 200>"$DIR/../var/run/rebuild.run"
 
 # vim: tabstop=2 shiftwidth=2 expandtab
