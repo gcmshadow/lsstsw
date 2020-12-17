@@ -178,7 +178,7 @@ UPDATE=false
 USE_TIMESTAMP=false
 refs=()
 
-while getopts ":pnur:t:v" o; do
+while getopts ":pnur:t:vT" o; do
   case "$o" in
   p)
     PREP_ONLY=true
@@ -262,8 +262,6 @@ config_curl
     VERSIONDB_HEAD_PREBUILD=$(versiondb_head)
   fi
 
-  BUILD_ID="T$(date '+%Y%m%d%H%M%S')"
-  echo "$exec_name >>  using build-ID $BUILD_ID"
 
   ARGS=()
   if [[ $NO_FETCH == true ]]; then
@@ -271,9 +269,14 @@ config_curl
   fi
   ARGS+=("--repos=${REPOSFILE}")
   ARGS+=("--exclusion-map=${EXCLUSIONS}")
-  ARGS+=("--version-git-repo=${VERSIONDB}")
   if [[ $USE_TIMESTAMP == true ]]; then
+    BUILD_ID="T$(date '+%Y%m%d%H%M%S')"
+    echo "$exec_name >>  using build-ID $BUILD_ID"
     ARGS+=("--build-id=${BUILD_ID}")
+    # ensure nothing is pushed to the versionDB:
+    VERSIONDB_PUSH=false
+  else
+    ARGS+=("--version-git-repo=${VERSIONDB}")
   fi
   ARGS+=("$LSSTSW_BUILD_DIR")
   ARGS+=("${refs[@]}")
